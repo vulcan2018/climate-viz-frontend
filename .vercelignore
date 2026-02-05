@@ -17,5 +17,4 @@ vitest.config.ts
 .idea/
 
 # Ignore config files not needed for build
-tsconfig.node.json
 .eslintrc.cjs
