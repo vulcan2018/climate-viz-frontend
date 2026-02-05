@@ -149,13 +149,11 @@ export function TemperatureLayer({ opacity, visible }: TemperatureLayerProps) {
     // Create image URL
     const imageUrl = canvas.toDataURL();
 
-    // Calculate bounds for -180 to 180 range
-    // After rearrangement: first pixel is lon[splitIdx]-360, last is lon[splitIdx-1]
-    const westLon = lons[splitIdx] - 360; // e.g., 185 - 360 = -175
-    const eastLon = lons[splitIdx - 1];   // e.g., 180
+    // Extend bounds to cover full globe (-180 to 180)
+    // Edge pixels will stretch slightly to fill the 5° gaps
     const bounds: L.LatLngBoundsExpression = [
-      [lats[lats.length - 1], westLon], // SW corner
-      [lats[0], eastLon], // NE corner
+      [lats[lats.length - 1], -180], // SW corner
+      [lats[0], 180], // NE corner
     ];
 
     // Remove old overlay
