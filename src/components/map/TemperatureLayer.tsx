@@ -136,9 +136,10 @@ export function TemperatureLayer({ opacity, visible }: TemperatureLayerProps) {
     const imageUrl = canvas.toDataURL();
 
     // Calculate bounds (lats go from 90 to -90, lons from 0 to 355)
+    // ERA5 uses 0-360 longitude, Leaflet handles this correctly
     const bounds: L.LatLngBoundsExpression = [
-      [lats[lats.length - 1], lons[0] - 180], // SW corner
-      [lats[0], lons[lons.length - 1] - 180], // NE corner
+      [lats[lats.length - 1], lons[0]], // SW corner
+      [lats[0], lons[lons.length - 1]], // NE corner
     ];
 
     // Remove old overlay
