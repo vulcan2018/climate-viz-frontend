@@ -1,0 +1,21 @@
+# Ignore markdown files
+*.md
+README.md
+docs/*.md
+
+# Ignore tests
+tests/
+coverage/
+test-results/
+playwright-report/
+playwright.config.ts
+vitest.config.ts
+
+# Ignore development files
+.github/
+.vscode/
+.idea/
+
+# Ignore config files not needed for build
+tsconfig.node.json
+.eslintrc.cjs
