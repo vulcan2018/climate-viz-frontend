@@ -3,7 +3,7 @@
  */
 
 import { RefObject, useCallback } from 'react';
-import { Cartesian3, Math as CesiumMath } from 'cesium';
+import { Cartesian3 } from 'cesium';
 import type { Viewer as CesiumViewer } from 'cesium';
 
 interface GlobeControlsProps {

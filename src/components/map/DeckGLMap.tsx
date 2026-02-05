@@ -4,7 +4,7 @@
 
 import { useCallback, useState, useMemo } from 'react';
 import DeckGL from '@deck.gl/react';
-import { BitmapLayer, GeoJsonLayer } from '@deck.gl/layers';
+import { GeoJsonLayer } from '@deck.gl/layers';
 import { MapView } from '@deck.gl/core';
 import { useMapStore } from '../../stores/mapStore';
 import { useDataStore } from '../../stores/dataStore';
@@ -28,7 +28,7 @@ const INITIAL_VIEW_STATE = {
 
 export function DeckGLMap({ onPointSelect }: DeckGLMapProps) {
   const [viewState, setViewState] = useState(INITIAL_VIEW_STATE);
-  const { selectedPoint, projection } = useMapStore();
+  const { selectedPoint } = useMapStore();
   const { currentGrid, colormap, valueRange } = useDataStore();
 
   // Handle map click
@@ -143,7 +143,7 @@ export function DeckGLMap({ onPointSelect }: DeckGLMapProps) {
     <div className="w-full h-full relative" role="application" aria-label="2D Map visualization">
       <DeckGL
         viewState={viewState}
-        onViewStateChange={({ viewState: newViewState }) => setViewState(newViewState as typeof viewState)}
+        onViewStateChange={(params: { viewState: typeof viewState }) => setViewState(params.viewState)}
         controller={true}
         layers={layers}
         onClick={handleClick}

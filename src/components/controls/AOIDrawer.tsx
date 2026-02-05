@@ -4,7 +4,8 @@
 
 import { useState, useCallback } from 'react';
 import { useMapStore } from '../../stores/mapStore';
-import type { AOIPolygon, BoundingBox } from '../../types/map';
+import type { AOIPolygon } from '../../types/map';
+import type { BoundingBox } from '../../types/climate';
 
 interface AOIDrawerProps {
   onRegionSelect: (bbox: BoundingBox) => void;
@@ -25,7 +26,7 @@ export function AOIDrawer({ onRegionSelect }: AOIDrawerProps) {
     setAOI(null);
   }, [setAOI]);
 
-  const completeDrawing = useCallback(
+  const _completeDrawing = useCallback(
     (polygon: AOIPolygon) => {
       setIsDrawing(false);
       setAOI(polygon);
@@ -45,6 +46,8 @@ export function AOIDrawer({ onRegionSelect }: AOIDrawerProps) {
     },
     [setAOI, onRegionSelect]
   );
+  // TODO: Wire up _completeDrawing to map drawing interactions
+  void _completeDrawing;
 
   const clearAOI = useCallback(() => {
     setAOI(null);

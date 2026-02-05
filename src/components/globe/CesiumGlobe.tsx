@@ -5,6 +5,7 @@
 import { useRef, useCallback } from 'react';
 import { Viewer, Entity, ImageryLayer, Globe } from 'resium';
 import {
+  Cartesian2,
   Cartesian3,
   ScreenSpaceEventType,
   UrlTemplateImageryProvider,
@@ -12,7 +13,6 @@ import {
   Color,
 } from 'cesium';
 import { useMapStore } from '../../stores/mapStore';
-import { useDataStore } from '../../stores/dataStore';
 import { GlobeControls } from './GlobeControls';
 import { announceToScreenReader, formatCoordinatesForScreenReader } from '../../utils/accessibility';
 import type { Viewer as CesiumViewer } from 'cesium';
@@ -24,7 +24,6 @@ interface CesiumGlobeProps {
 export function CesiumGlobe({ onPointSelect }: CesiumGlobeProps) {
   const viewerRef = useRef<CesiumViewer | null>(null);
   const { selectedPoint } = useMapStore();
-  const { currentGrid, colormap, valueRange } = useDataStore();
 
   // Handle click on globe
   const handleClick = useCallback(
@@ -32,8 +31,9 @@ export function CesiumGlobe({ onPointSelect }: CesiumGlobeProps) {
       const viewer = viewerRef.current;
       if (!viewer) return;
 
+      const position = new Cartesian2(movement.position.x, movement.position.y);
       const cartesian = viewer.camera.pickEllipsoid(
-        movement.position,
+        position,
         viewer.scene.globe.ellipsoid
       );
 
