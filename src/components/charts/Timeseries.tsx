@@ -2,6 +2,7 @@
  * Timeseries chart component using Recharts.
  */
 
+import { useMemo } from 'react';
 import {
   LineChart,
   Line,
@@ -11,9 +12,11 @@ import {
   Tooltip,
   ResponsiveContainer,
   ReferenceLine,
+  ReferenceDot,
 } from 'recharts';
 import { useTimeseries, useTrend } from '../../hooks/useTimeseries';
 import { useDataStore } from '../../stores/dataStore';
+import { useMapStore } from '../../stores/mapStore';
 import { formatValueForScreenReader, formatCoordinatesForScreenReader } from '../../utils/accessibility';
 
 interface TimeseriesProps {
@@ -24,15 +27,53 @@ interface TimeseriesProps {
 
 export function Timeseries({ lat, lon, onClose }: TimeseriesProps) {
   const { selectedDatasetId } = useDataStore();
-  const { data: timeseries, isLoading, error } = useTimeseries(selectedDatasetId, lat, lon);
+  const { animation } = useMapStore();
+
+  // Get current year from animation for API query
+  const currentYear = useMemo(() => {
+    const date = new Date(animation.currentTime);
+    return date.getFullYear();
+  }, [animation.currentTime]);
+
+  // Pass current year to API - data will change when year changes
+  const startDate = `${currentYear}-01-01`;
+  const { data: timeseries, isLoading, error } = useTimeseries(selectedDatasetId, lat, lon, startDate);
   const { data: trend } = useTrend(selectedDatasetId, lat, lon);
 
+  // Get current month from animation
+  const currentMonth = useMemo(() => {
+    const date = new Date(animation.currentTime);
+    return date.getMonth() + 1; // 1-12
+  }, [animation.currentTime]);
+
   // Transform data for Recharts
-  const chartData = timeseries?.times.map((time, i) => ({
-    time,
-    value: timeseries.values[i],
-    valueCelsius: timeseries.values[i] - 273.15,
-  })) || [];
+  const chartData = useMemo(() => {
+    if (!timeseries) return [];
+    return timeseries.times.map((time, i) => ({
+      time,
+      month: new Date(time).getMonth() + 1,
+      value: timeseries.values[i],
+      valueCelsius: timeseries.values[i] - 273.15,
+    }));
+  }, [timeseries]);
+
+  // Find current value based on animation time
+  const currentValue = useMemo(() => {
+    const dataPoint = chartData.find(d => d.month === currentMonth);
+    return dataPoint?.valueCelsius;
+  }, [chartData, currentMonth]);
+
+  // Find the x-axis value for current time
+  const currentTimeX = useMemo(() => {
+    const dataPoint = chartData.find(d => d.month === currentMonth);
+    return dataPoint?.time;
+  }, [chartData, currentMonth]);
+
+  // Format month name
+  const formatMonth = (dateStr: string) => {
+    const date = new Date(dateStr);
+    return date.toLocaleDateString('en-GB', { month: 'short' });
+  };
 
   return (
     <div
@@ -59,6 +100,18 @@ export function Timeseries({ lat, lon, onClose }: TimeseriesProps) {
         </button>
       </div>
 
+      {/* Current value display */}
+      {currentValue !== undefined && (
+        <div className="mb-3 p-2 bg-slate-800 rounded-lg">
+          <div className="text-xs text-slate-400">
+            {formatMonth(animation.currentTime)} {new Date(animation.currentTime).getFullYear()}
+          </div>
+          <div className="text-lg font-bold text-blue-400">
+            {currentValue.toFixed(1)}°C
+          </div>
+        </div>
+      )}
+
       {/* Loading state */}
       {isLoading && (
         <div className="h-48 flex items-center justify-center">
@@ -83,7 +136,7 @@ export function Timeseries({ lat, lon, onClose }: TimeseriesProps) {
                 <XAxis
                   dataKey="time"
                   tick={{ fontSize: 10, fill: '#94a3b8' }}
-                  tickFormatter={(value) => value.slice(5, 7)} // Show month
+                  tickFormatter={(value) => formatMonth(value)}
                   stroke="#475569"
                 />
                 <YAxis
@@ -100,6 +153,7 @@ export function Timeseries({ lat, lon, onClose }: TimeseriesProps) {
                     fontSize: '12px',
                   }}
                   labelStyle={{ color: '#94a3b8' }}
+                  labelFormatter={(value) => formatMonth(value as string)}
                   formatter={(value: number) => [`${value.toFixed(1)}°C`, 'Temperature']}
                 />
                 <Line
@@ -110,17 +164,24 @@ export function Timeseries({ lat, lon, onClose }: TimeseriesProps) {
                   dot={false}
                   activeDot={{ r: 4, fill: '#3b82f6' }}
                 />
-                {/* Trend line */}
-                {trend?.significant && (
+                {/* Current time reference line */}
+                {currentTimeX && (
                   <ReferenceLine
-                    stroke="#ef4444"
-                    strokeDasharray="5 5"
-                    label={{
-                      value: 'Trend',
-                      position: 'insideTopRight',
-                      fill: '#ef4444',
-                      fontSize: 10,
-                    }}
+                    x={currentTimeX}
+                    stroke="#22c55e"
+                    strokeWidth={2}
+                    strokeDasharray="3 3"
+                  />
+                )}
+                {/* Current time dot */}
+                {currentTimeX && currentValue !== undefined && (
+                  <ReferenceDot
+                    x={currentTimeX}
+                    y={currentValue}
+                    r={6}
+                    fill="#22c55e"
+                    stroke="#fff"
+                    strokeWidth={2}
                   />
                 )}
               </LineChart>
@@ -150,6 +211,7 @@ export function Timeseries({ lat, lon, onClose }: TimeseriesProps) {
           {/* Screen reader summary */}
           <div className="sr-only">
             Temperature timeseries showing {chartData.length} data points.
+            Current value: {currentValue?.toFixed(1)} degrees Celsius.
             {trend && (
               <>
                 Linear trend: {formatValueForScreenReader(trend.slope * 10, 'degrees Celsius per decade')}.

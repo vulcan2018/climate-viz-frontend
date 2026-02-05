@@ -17,6 +17,10 @@ interface UIState {
   reduceMotion: boolean;
   highContrast: boolean;
 
+  // Temperature layer
+  showTemperature: boolean;
+  temperatureOpacity: number;
+
   // Actions
   toggleSidebar: () => void;
   setSidebarTab: (tab: 'layers' | 'data' | 'analysis') => void;
@@ -25,6 +29,8 @@ interface UIState {
   setShowGrid: (show: boolean) => void;
   setReduceMotion: (reduce: boolean) => void;
   setHighContrast: (high: boolean) => void;
+  setShowTemperature: (show: boolean) => void;
+  setTemperatureOpacity: (opacity: number) => void;
 }
 
 export const useUIStore = create<UIState>()(
@@ -37,6 +43,8 @@ export const useUIStore = create<UIState>()(
       showGrid: false,
       reduceMotion: false,
       highContrast: false,
+      showTemperature: true,
+      temperatureOpacity: 0.7,
 
       toggleSidebar: () => set((state) => ({ sidebarOpen: !state.sidebarOpen })),
 
@@ -51,6 +59,10 @@ export const useUIStore = create<UIState>()(
       setReduceMotion: (reduce) => set({ reduceMotion: reduce }),
 
       setHighContrast: (high) => set({ highContrast: high }),
+
+      setShowTemperature: (show) => set({ showTemperature: show }),
+
+      setTemperatureOpacity: (opacity) => set({ temperatureOpacity: opacity }),
     }),
     {
       name: 'climate-viz-ui',
@@ -60,6 +72,8 @@ export const useUIStore = create<UIState>()(
         showGrid: state.showGrid,
         reduceMotion: state.reduceMotion,
         highContrast: state.highContrast,
+        showTemperature: state.showTemperature,
+        temperatureOpacity: state.temperatureOpacity,
       }),
     }
   )

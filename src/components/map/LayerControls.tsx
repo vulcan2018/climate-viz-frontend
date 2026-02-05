@@ -13,12 +13,17 @@ interface Layer {
 }
 
 export function LayerControls() {
-  const { showLabels, setShowLabels, showGrid, setShowGrid } = useUIStore();
+  const {
+    showLabels, setShowLabels,
+    showGrid, setShowGrid,
+    showTemperature, setShowTemperature,
+    temperatureOpacity, setTemperatureOpacity
+  } = useUIStore();
   const [isOpen, setIsOpen] = useState(false);
 
   const [layers, setLayers] = useState<Layer[]>([
     { id: 'basemap', name: 'Base Map', visible: true, opacity: 1 },
-    { id: 'temperature', name: 'Temperature', visible: true, opacity: 0.8 },
+    { id: 'temperature', name: 'Temperature (ERA5)', visible: showTemperature, opacity: temperatureOpacity },
     { id: 'labels', name: 'Labels', visible: showLabels, opacity: 1 },
     { id: 'grid', name: 'Lat/Lon Grid', visible: showGrid, opacity: 0.5 },
   ]);
@@ -34,6 +39,8 @@ export function LayerControls() {
       setShowLabels(!showLabels);
     } else if (id === 'grid') {
       setShowGrid(!showGrid);
+    } else if (id === 'temperature') {
+      setShowTemperature(!showTemperature);
     }
   };
 
@@ -41,6 +48,10 @@ export function LayerControls() {
     setLayers((prev) =>
       prev.map((layer) => (layer.id === id ? { ...layer, opacity } : layer))
     );
+
+    if (id === 'temperature') {
+      setTemperatureOpacity(opacity);
+    }
   };
 
   return (

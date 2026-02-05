@@ -1,9 +1,11 @@
-import { useState, useCallback, Suspense, lazy } from 'react';
+import { useState, useCallback, useEffect, Suspense, lazy } from 'react';
 import { Header } from './components/layout/Header';
 import { Sidebar } from './components/layout/Sidebar';
 import { TimelineSlider } from './components/controls/TimelineSlider';
 import { useMapStore } from './stores/mapStore';
 import { useUIStore } from './stores/uiStore';
+import { useDataStore } from './stores/dataStore';
+import { useDatasets } from './hooks/useClimateData';
 
 // Lazy load heavy components
 const CesiumGlobe = lazy(() => import('./components/globe/CesiumGlobe').then(m => ({ default: m.CesiumGlobe })));
@@ -24,6 +26,22 @@ function App() {
   const [viewMode, setViewMode] = useState<ViewMode>('2d');
   const { selectedPoint, setSelectedPoint } = useMapStore();
   const { sidebarOpen, toggleSidebar } = useUIStore();
+  const { setDatasets, selectDataset, selectedDatasetId } = useDataStore();
+
+  // Fetch datasets from API
+  const { data: datasets } = useDatasets();
+
+  // Auto-select first dataset when loaded
+  useEffect(() => {
+    if (datasets && datasets.length > 0) {
+      setDatasets(datasets);
+      // Select ERA5 temperature by default, or first available
+      const defaultDataset = datasets.find(d => d.id === 'era5-t2m') || datasets[0];
+      if (!selectedDatasetId && defaultDataset) {
+        selectDataset(defaultDataset.id);
+      }
+    }
+  }, [datasets, setDatasets, selectDataset, selectedDatasetId]);
 
   const handlePointSelect = useCallback(
     (lat: number, lon: number) => {
@@ -64,13 +82,13 @@ function App() {
           </div>
 
           {/* Timeline control */}
-          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 w-full max-w-2xl px-4 z-10">
+          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 w-full max-w-2xl px-4 z-[1000]">
             <TimelineSlider />
           </div>
 
           {/* Timeseries chart (when point selected) */}
           {selectedPoint && (
-            <div className="absolute top-4 right-4 w-96 z-10">
+            <div className="absolute top-4 right-4 w-96 z-[1000]">
               <Suspense fallback={<LoadingFallback />}>
                 <Timeseries
                   lat={selectedPoint.lat}

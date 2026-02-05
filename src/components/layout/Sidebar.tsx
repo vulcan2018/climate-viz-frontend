@@ -171,7 +171,7 @@ export function Sidebar({ isOpen, onToggle }: SidebarProps) {
           {/* Footer */}
           <div className="border-t border-slate-700 p-4">
             <p className="text-xs text-slate-500">
-              Data: ERA5 Reanalysis (ECMWF)
+              Data: ERA5 Reanalysis
             </p>
             <p className="text-xs text-slate-500">
               Built by FIRA Software Ltd
