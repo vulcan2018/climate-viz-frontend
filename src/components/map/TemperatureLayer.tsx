@@ -64,7 +64,7 @@ function temperatureToColor(tempK: number): [number, number, number] {
 export function TemperatureLayer({ opacity, visible }: TemperatureLayerProps) {
   const map = useMap();
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const overlayRef = useRef<L.ImageOverlay | null>(null);
+  const overlaysRef = useRef<L.ImageOverlay[]>([]);
   const [era5Data, setEra5Data] = useState<ERA5Data | null>(null);
   const { animation } = useMapStore();
 
@@ -84,11 +84,9 @@ export function TemperatureLayer({ opacity, visible }: TemperatureLayerProps) {
   // Render temperature overlay
   useEffect(() => {
     if (!era5Data || !visible) {
-      // Remove overlay if not visible
-      if (overlayRef.current) {
-        map.removeLayer(overlayRef.current);
-        overlayRef.current = null;
-      }
+      // Remove overlays if not visible
+      overlaysRef.current.forEach((overlay) => map.removeLayer(overlay));
+      overlaysRef.current = [];
       return;
     }
 
@@ -149,40 +147,42 @@ export function TemperatureLayer({ opacity, visible }: TemperatureLayerProps) {
     // Create image URL
     const imageUrl = canvas.toDataURL();
 
-    // Extend bounds to cover full globe (-180 to 180)
-    // Edge pixels will stretch slightly to fill the 5° gaps
-    const bounds: L.LatLngBoundsExpression = [
-      [lats[lats.length - 1], -180], // SW corner
-      [lats[0], 180], // NE corner
-    ];
+    // Remove old overlays
+    overlaysRef.current.forEach((overlay) => map.removeLayer(overlay));
+    overlaysRef.current = [];
 
-    // Remove old overlay
-    if (overlayRef.current) {
-      map.removeLayer(overlayRef.current);
-    }
+    // Add overlays for world wrapping (left copy, center, right copy)
+    // This ensures the temperature layer shows when panning across the date line
+    const latSouth = lats[lats.length - 1];
+    const latNorth = lats[0];
+    const worldOffsets = [-360, 0, 360]; // Left wrap, center, right wrap
 
-    // Add new overlay
-    const overlay = L.imageOverlay(imageUrl, bounds, {
-      opacity: opacity,
-      interactive: false,
+    worldOffsets.forEach((offset) => {
+      const bounds: L.LatLngBoundsExpression = [
+        [latSouth, -180 + offset], // SW corner
+        [latNorth, 180 + offset], // NE corner
+      ];
+
+      const overlay = L.imageOverlay(imageUrl, bounds, {
+        opacity: opacity,
+        interactive: false,
+      });
+
+      overlay.addTo(map);
+      overlaysRef.current.push(overlay);
     });
 
-    overlay.addTo(map);
-    overlayRef.current = overlay;
-
     return () => {
-      if (overlayRef.current) {
-        map.removeLayer(overlayRef.current);
-        overlayRef.current = null;
-      }
+      overlaysRef.current.forEach((overlay) => map.removeLayer(overlay));
+      overlaysRef.current = [];
     };
   }, [era5Data, map, year, month, opacity, visible]);
 
   // Update opacity when it changes
   useEffect(() => {
-    if (overlayRef.current) {
-      overlayRef.current.setOpacity(opacity);
-    }
+    overlaysRef.current.forEach((overlay) => {
+      overlay.setOpacity(opacity);
+    });
   }, [opacity]);
 
   return null; // This component renders via Leaflet, not React DOM
