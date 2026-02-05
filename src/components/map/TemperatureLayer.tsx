@@ -114,15 +114,29 @@ export function TemperatureLayer({ opacity, visible }: TemperatureLayerProps) {
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    // Draw temperature data
+    // Find the index where longitude crosses 180 (to rearrange for -180 to 180)
+    // ERA5 lons are 0, 5, 10, ..., 355. We need to rearrange so it goes -180 to 180
+    // Lons > 180 become negative (e.g., 185 -> -175, 355 -> -5)
+    const splitIdx = lons.findIndex((lon) => lon > 180); // First lon > 180
+
+    // Draw temperature data with longitude rearrangement
     const imageData = ctx.createImageData(width, height);
 
     for (let latIdx = 0; latIdx < height; latIdx++) {
-      for (let lonIdx = 0; lonIdx < width; lonIdx++) {
-        const temp = grid[latIdx][lonIdx];
+      for (let newLonIdx = 0; newLonIdx < width; newLonIdx++) {
+        // Map new pixel position to original data index
+        // New order: [splitIdx, splitIdx+1, ..., width-1, 0, 1, ..., splitIdx-1]
+        let origLonIdx: number;
+        if (newLonIdx < width - splitIdx) {
+          origLonIdx = splitIdx + newLonIdx;
+        } else {
+          origLonIdx = newLonIdx - (width - splitIdx);
+        }
+
+        const temp = grid[latIdx][origLonIdx];
         const [r, g, b] = temperatureToColor(temp);
 
-        const pixelIdx = (latIdx * width + lonIdx) * 4;
+        const pixelIdx = (latIdx * width + newLonIdx) * 4;
         imageData.data[pixelIdx] = r;
         imageData.data[pixelIdx + 1] = g;
         imageData.data[pixelIdx + 2] = b;
@@ -135,11 +149,13 @@ export function TemperatureLayer({ opacity, visible }: TemperatureLayerProps) {
     // Create image URL
     const imageUrl = canvas.toDataURL();
 
-    // Calculate bounds (lats go from 90 to -90, lons from 0 to 355)
-    // ERA5 uses 0-360 longitude, Leaflet handles this correctly
+    // Calculate bounds for -180 to 180 range
+    // After rearrangement: first pixel is lon[splitIdx]-360, last is lon[splitIdx-1]
+    const westLon = lons[splitIdx] - 360; // e.g., 185 - 360 = -175
+    const eastLon = lons[splitIdx - 1];   // e.g., 180
     const bounds: L.LatLngBoundsExpression = [
-      [lats[lats.length - 1], lons[0]], // SW corner
-      [lats[0], lons[lons.length - 1]], // NE corner
+      [lats[lats.length - 1], westLon], // SW corner
+      [lats[0], eastLon], // NE corner
     ];
 
     // Remove old overlay
