@@ -1,17 +1,27 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, Suspense, lazy } from 'react';
 import { Header } from './components/layout/Header';
 import { Sidebar } from './components/layout/Sidebar';
-import { CesiumGlobe } from './components/globe/CesiumGlobe';
-import { DeckGLMap } from './components/map/DeckGLMap';
-import { Timeseries } from './components/charts/Timeseries';
 import { TimelineSlider } from './components/controls/TimelineSlider';
 import { useMapStore } from './stores/mapStore';
 import { useUIStore } from './stores/uiStore';
 
+// Lazy load heavy components
+const CesiumGlobe = lazy(() => import('./components/globe/CesiumGlobe').then(m => ({ default: m.CesiumGlobe })));
+const DeckGLMap = lazy(() => import('./components/map/DeckGLMap').then(m => ({ default: m.DeckGLMap })));
+const Timeseries = lazy(() => import('./components/charts/Timeseries').then(m => ({ default: m.Timeseries })));
+
 type ViewMode = '3d' | '2d';
 
+function LoadingFallback() {
+  return (
+    <div className="w-full h-full flex items-center justify-center bg-slate-900">
+      <div className="text-white">Loading...</div>
+    </div>
+  );
+}
+
 function App() {
-  const [viewMode, setViewMode] = useState<ViewMode>('3d');
+  const [viewMode, setViewMode] = useState<ViewMode>('2d');
   const { selectedPoint, setSelectedPoint } = useMapStore();
   const { sidebarOpen, toggleSidebar } = useUIStore();
 
@@ -23,7 +33,7 @@ function App() {
   );
 
   return (
-    <div className="h-full flex flex-col">
+    <div className="h-full flex flex-col bg-slate-900">
       {/* Skip link for keyboard accessibility */}
       <a href="#main-content" className="skip-link">
         Skip to main content
@@ -44,26 +54,30 @@ function App() {
         >
           {/* Map/Globe view */}
           <div className="absolute inset-0">
-            {viewMode === '3d' ? (
-              <CesiumGlobe onPointSelect={handlePointSelect} />
-            ) : (
-              <DeckGLMap onPointSelect={handlePointSelect} />
-            )}
+            <Suspense fallback={<LoadingFallback />}>
+              {viewMode === '3d' ? (
+                <CesiumGlobe onPointSelect={handlePointSelect} />
+              ) : (
+                <DeckGLMap onPointSelect={handlePointSelect} />
+              )}
+            </Suspense>
           </div>
 
           {/* Timeline control */}
-          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 w-full max-w-2xl px-4">
+          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 w-full max-w-2xl px-4 z-10">
             <TimelineSlider />
           </div>
 
           {/* Timeseries chart (when point selected) */}
           {selectedPoint && (
-            <div className="absolute top-4 right-4 w-96">
-              <Timeseries
-                lat={selectedPoint.lat}
-                lon={selectedPoint.lon}
-                onClose={() => setSelectedPoint(null)}
-              />
+            <div className="absolute top-4 right-4 w-96 z-10">
+              <Suspense fallback={<LoadingFallback />}>
+                <Timeseries
+                  lat={selectedPoint.lat}
+                  lon={selectedPoint.lon}
+                  onClose={() => setSelectedPoint(null)}
+                />
+              </Suspense>
             </div>
           )}
         </main>

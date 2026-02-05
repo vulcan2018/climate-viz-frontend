@@ -94,7 +94,6 @@ export function CesiumGlobe({ onPointSelect }: CesiumGlobeProps) {
         navigationHelpButton={false}
         fullscreenButton={false}
         infoBox={false}
-        creditContainer={document.createElement('div')} // Hide credits
       >
         <Globe
           enableLighting={false}
