@@ -18,7 +18,6 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks: {
-          cesium: ['cesium', 'resium'],
           deckgl: ['@deck.gl/core', '@deck.gl/layers', '@deck.gl/react'],
           charts: ['recharts', 'd3-scale', 'd3-scale-chromatic'],
         },
