@@ -5,13 +5,28 @@
 declare module '@deck.gl/react' {
   import { ComponentType } from 'react';
 
+  interface ViewState {
+    longitude: number;
+    latitude: number;
+    zoom: number;
+    pitch?: number;
+    bearing?: number;
+  }
+
+  interface PickingInfo {
+    object?: Record<string, unknown>;
+    coordinate?: [number, number];
+    x?: number;
+    y?: number;
+  }
+
   interface DeckGLProps {
-    viewState?: Record<string, unknown>;
-    onViewStateChange?: (params: { viewState: unknown }) => void;
+    viewState?: ViewState;
+    onViewStateChange?: (params: { viewState: ViewState }) => void;
     controller?: boolean;
     layers?: unknown[];
-    onClick?: (info: unknown) => void;
-    getTooltip?: (info: unknown) => unknown;
+    onClick?: (info: PickingInfo) => void;
+    getTooltip?: (info: PickingInfo) => { html: string } | null;
     views?: unknown;
     children?: React.ReactNode;
   }
@@ -36,7 +51,7 @@ declare module '@deck.gl/core' {
   }
 
   export interface PickingInfo {
-    object?: unknown;
+    object?: Record<string, unknown>;
     coordinate?: [number, number];
     x?: number;
     y?: number;

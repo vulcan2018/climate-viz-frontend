@@ -12,7 +12,11 @@ import { MapProjection } from './MapProjection';
 import { LayerControls } from './LayerControls';
 import { createColorScale, valueToRGBA } from '../../utils/colormaps';
 import { announceToScreenReader, formatCoordinatesForScreenReader } from '../../utils/accessibility';
-import type { PickingInfo } from '@deck.gl/core';
+
+interface PickingInfo {
+  object?: Record<string, unknown>;
+  coordinate?: [number, number];
+}
 
 interface DeckGLMapProps {
   onPointSelect: (lat: number, lon: number) => void;
