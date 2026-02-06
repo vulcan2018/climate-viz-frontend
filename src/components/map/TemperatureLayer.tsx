@@ -142,10 +142,10 @@ export function TemperatureLayer({ opacity, visible }: TemperatureLayerProps) {
 
     // Data spans 0° to 355° longitude (72 points at 5° spacing)
     // Empirical corrections - fine tuning based on visual feedback
-    const latSouth = lats[lats.length - 1] + 5; // -85 (small north shift)
-    const latNorth = lats[0] + 5; // 95
-    const lonWest = lons[0] - 5; // -5 (small west shift)
-    const lonEast = lons[lons.length - 1] + 5 - 5; // 355
+    const latSouth = lats[lats.length - 1] + 10; // -80 (10° north - halfway between 5 and 15)
+    const latNorth = lats[0] + 10; // 100
+    const lonWest = lons[0] - 3; // -3 (tiny bit less west)
+    const lonEast = lons[lons.length - 1] + 5 - 3; // 357
 
     // Add overlays: main, left wrap, right wrap
     const worldOffsets = [-360, 0, 360];
