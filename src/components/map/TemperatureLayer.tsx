@@ -141,12 +141,13 @@ export function TemperatureLayer({ opacity, visible }: TemperatureLayerProps) {
     overlaysRef.current = [];
 
     // Data spans 0° to 355° longitude (72 points at 5° spacing)
-    // Empirically correcting for observed ~30° eastward shift
-    // Data hottest at lon=140° but displays at ~170°, so shift 30° west
-    const latSouth = lats[lats.length - 1]; // -90
-    const latNorth = lats[0]; // 90
-    const lonWest = lons[0] - 30; // -30 (empirical correction)
-    const lonEast = lons[lons.length - 1] + 5 - 30; // 330
+    // Empirical corrections based on observed offsets:
+    // - Longitude was ~30° east, then overcorrected to ~30° west, try ~15° west
+    // - Latitude appears ~15° south of correct position, shift north
+    const latSouth = lats[lats.length - 1] + 15; // -75 (shift north)
+    const latNorth = lats[0] + 15; // 105 (shift north, will be clamped)
+    const lonWest = lons[0] - 15; // -15 (smaller west shift)
+    const lonEast = lons[lons.length - 1] + 5 - 15; // 345
 
     // Add overlays: main, left wrap, right wrap
     const worldOffsets = [-360, 0, 360];
