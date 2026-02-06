@@ -117,14 +117,13 @@ export function TemperatureLayer({ opacity, visible }: TemperatureLayerProps) {
     // Lons > 180 become negative (e.g., 185 -> -175, 355 -> -5)
     const splitIdx = lons.findIndex((lon) => lon > 180); // First lon > 180
 
-    // Draw temperature data with longitude rearrangement and latitude flip
+    // Draw temperature data with longitude rearrangement
+    // Lats array is [90, 85, ..., -90] (north to south)
+    // grid[0] = north pole, grid[last] = south pole
+    // Canvas row 0 = top = north, which matches correctly
     const imageData = ctx.createImageData(width, height);
 
-    for (let canvasRow = 0; canvasRow < height; canvasRow++) {
-      // Flip latitude: canvas row 0 (top) should be north (lat index 0)
-      // But data may be stored south-to-north, so we flip
-      const dataLatIdx = height - 1 - canvasRow;
-
+    for (let latIdx = 0; latIdx < height; latIdx++) {
       for (let newLonIdx = 0; newLonIdx < width; newLonIdx++) {
         // Map new pixel position to original data index
         // New order: [splitIdx, splitIdx+1, ..., width-1, 0, 1, ..., splitIdx-1]
@@ -135,10 +134,10 @@ export function TemperatureLayer({ opacity, visible }: TemperatureLayerProps) {
           origLonIdx = newLonIdx - (width - splitIdx);
         }
 
-        const temp = grid[dataLatIdx][origLonIdx];
+        const temp = grid[latIdx][origLonIdx];
         const [r, g, b] = temperatureToColor(temp);
 
-        const pixelIdx = (canvasRow * width + newLonIdx) * 4;
+        const pixelIdx = (latIdx * width + newLonIdx) * 4;
         imageData.data[pixelIdx] = r;
         imageData.data[pixelIdx + 1] = g;
         imageData.data[pixelIdx + 2] = b;
