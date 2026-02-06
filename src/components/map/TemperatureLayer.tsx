@@ -112,32 +112,18 @@ export function TemperatureLayer({ opacity, visible }: TemperatureLayerProps) {
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    // Find the index where longitude crosses 180 (to rearrange for -180 to 180)
-    // ERA5 lons are 0, 5, 10, ..., 355. We need to rearrange so it goes -180 to 180
-    // Lons > 180 become negative (e.g., 185 -> -175, 355 -> -5)
-    const splitIdx = lons.findIndex((lon) => lon > 180); // First lon > 180
-
-    // Draw temperature data with longitude rearrangement
+    // Draw temperature data WITHOUT rearrangement
+    // Keep original order: lons 0, 5, ..., 355 (0° to 355°E)
     // Lats array is [90, 85, ..., -90] (north to south)
     // grid[0] = north pole, grid[last] = south pole
-    // Canvas row 0 = top = north, which matches correctly
     const imageData = ctx.createImageData(width, height);
 
     for (let latIdx = 0; latIdx < height; latIdx++) {
-      for (let newLonIdx = 0; newLonIdx < width; newLonIdx++) {
-        // Map new pixel position to original data index
-        // New order: [splitIdx, splitIdx+1, ..., width-1, 0, 1, ..., splitIdx-1]
-        let origLonIdx: number;
-        if (newLonIdx < width - splitIdx) {
-          origLonIdx = splitIdx + newLonIdx;
-        } else {
-          origLonIdx = newLonIdx - (width - splitIdx);
-        }
-
-        const temp = grid[latIdx][origLonIdx];
+      for (let lonIdx = 0; lonIdx < width; lonIdx++) {
+        const temp = grid[latIdx][lonIdx];
         const [r, g, b] = temperatureToColor(temp);
 
-        const pixelIdx = (latIdx * width + newLonIdx) * 4;
+        const pixelIdx = (latIdx * width + lonIdx) * 4;
         imageData.data[pixelIdx] = r;
         imageData.data[pixelIdx + 1] = g;
         imageData.data[pixelIdx + 2] = b;
@@ -154,16 +140,20 @@ export function TemperatureLayer({ opacity, visible }: TemperatureLayerProps) {
     overlaysRef.current.forEach((overlay) => map.removeLayer(overlay));
     overlaysRef.current = [];
 
-    // Add overlays for world wrapping (left copy, center, right copy)
-    // This ensures the temperature layer shows when panning across the date line
-    const latSouth = lats[lats.length - 1];
-    const latNorth = lats[0];
-    const worldOffsets = [-360, 0, 360]; // Left wrap, center, right wrap
+    // Data spans 0° to 355° longitude (72 points at 5° spacing)
+    // Use actual data bounds, then add world-wrapped copies
+    const latSouth = lats[lats.length - 1]; // -90
+    const latNorth = lats[0]; // 90
+    const lonWest = lons[0]; // 0
+    const lonEast = lons[lons.length - 1] + 5; // 355 + 5 = 360 (extend to close the gap)
+
+    // Add overlays: main (0-360), left wrap (-360 to 0), right wrap (360-720)
+    const worldOffsets = [-360, 0, 360];
 
     worldOffsets.forEach((offset) => {
       const bounds: L.LatLngBoundsExpression = [
-        [latSouth, -180 + offset], // SW corner
-        [latNorth, 180 + offset], // NE corner
+        [latSouth, lonWest + offset], // SW corner
+        [latNorth, lonEast + offset], // NE corner
       ];
 
       const overlay = L.imageOverlay(imageUrl, bounds, {
