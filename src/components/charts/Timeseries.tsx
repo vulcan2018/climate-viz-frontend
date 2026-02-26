@@ -1,5 +1,7 @@
 /**
  * Timeseries chart component using Recharts.
+ * Migrated to Mantine UI per ECMWF requirements.
+ * Note: Recharts retained as per #39 clarification (Plotly for specific chart types).
  */
 
 import { useMemo } from 'react';
@@ -14,6 +16,7 @@ import {
   ReferenceLine,
   ReferenceDot,
 } from 'recharts';
+import { Paper, Box, Text, Title, Flex, ActionIcon, Loader, Center, Badge, Divider } from '@mantine/core';
 import { useTimeseries, useTrend } from '../../hooks/useTimeseries';
 import { useDataStore } from '../../stores/dataStore';
 import { useMapStore } from '../../stores/mapStore';
@@ -26,8 +29,13 @@ interface TimeseriesProps {
 }
 
 export function Timeseries({ lat, lon, onClose }: TimeseriesProps) {
-  const { selectedDatasetId } = useDataStore();
+  const { selectedDatasetId, datasets } = useDataStore();
   const { animation } = useMapStore();
+
+  // Get selected dataset info for units and variable name
+  const selectedDataset = useMemo(() => {
+    return datasets.find(d => d.id === selectedDatasetId);
+  }, [datasets, selectedDatasetId]);
 
   // Get current year from animation for API query
   const currentYear = useMemo(() => {
@@ -46,6 +54,23 @@ export function Timeseries({ lat, lon, onClose }: TimeseriesProps) {
     return date.getMonth() + 1; // 1-12
   }, [animation.currentTime]);
 
+  // Determine if we need to convert from Kelvin to Celsius
+  const isTemperature = useMemo(() => {
+    const units = timeseries?.units || selectedDataset?.units || '';
+    return units.toLowerCase() === 'k' || units.toLowerCase() === 'kelvin';
+  }, [timeseries, selectedDataset]);
+
+  // Get display units
+  const displayUnits = useMemo(() => {
+    if (isTemperature) return '°C';
+    return timeseries?.units || selectedDataset?.units || '';
+  }, [isTemperature, timeseries, selectedDataset]);
+
+  // Get variable name for display
+  const variableName = useMemo(() => {
+    return timeseries?.variable || selectedDataset?.name || 'Value';
+  }, [timeseries, selectedDataset]);
+
   // Transform data for Recharts
   const chartData = useMemo(() => {
     if (!timeseries) return [];
@@ -53,14 +78,14 @@ export function Timeseries({ lat, lon, onClose }: TimeseriesProps) {
       time,
       month: new Date(time).getMonth() + 1,
       value: timeseries.values[i],
-      valueCelsius: timeseries.values[i] - 273.15,
+      displayValue: isTemperature ? timeseries.values[i] - 273.15 : timeseries.values[i],
     }));
-  }, [timeseries]);
+  }, [timeseries, isTemperature]);
 
   // Find current value based on animation time
   const currentValue = useMemo(() => {
     const dataPoint = chartData.find(d => d.month === currentMonth);
-    return dataPoint?.valueCelsius;
+    return dataPoint?.displayValue;
   }, [chartData, currentMonth]);
 
   // Find the x-axis value for current time
@@ -76,60 +101,68 @@ export function Timeseries({ lat, lon, onClose }: TimeseriesProps) {
   };
 
   return (
-    <div
-      className="panel p-4"
+    <Paper
+      bg="dark.7"
+      p="md"
+      radius="md"
+      style={{
+        backdropFilter: 'blur(8px)',
+        backgroundColor: 'rgba(37, 38, 43, 0.95)',
+        border: '1px solid var(--mantine-color-dark-5)'
+      }}
       role="region"
       aria-label={`Timeseries chart for ${formatCoordinatesForScreenReader(lat, lon)}`}
     >
       {/* Header */}
-      <div className="flex items-start justify-between mb-4">
-        <div>
-          <h3 className="text-sm font-semibold text-white">Point Timeseries</h3>
-          <p className="text-xs text-slate-400 mt-0.5">
+      <Flex justify="space-between" align="flex-start" mb="sm">
+        <Box>
+          <Title order={6} c="white">Point Timeseries</Title>
+          <Text size="xs" c="dimmed">
             {lat.toFixed(2)}°, {lon.toFixed(2)}°
-          </p>
-        </div>
-        <button
+          </Text>
+        </Box>
+        <ActionIcon
+          variant="subtle"
+          color="gray"
           onClick={onClose}
-          className="text-slate-400 hover:text-white transition-colors"
           aria-label="Close timeseries panel"
         >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg style={{ width: 20, height: 20 }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
           </svg>
-        </button>
-      </div>
+        </ActionIcon>
+      </Flex>
 
       {/* Current value display */}
       {currentValue !== undefined && (
-        <div className="mb-3 p-2 bg-slate-800 rounded-lg">
-          <div className="text-xs text-slate-400">
+        <Paper bg="dark.6" p="xs" radius="sm" mb="sm">
+          <Text size="xs" c="dimmed">
             {formatMonth(animation.currentTime)} {new Date(animation.currentTime).getFullYear()}
-          </div>
-          <div className="text-lg font-bold text-blue-400">
-            {currentValue.toFixed(1)}°C
-          </div>
-        </div>
+          </Text>
+          <Text size="lg" fw={700} c="blue.4">
+            {currentValue.toFixed(1)} {displayUnits}
+          </Text>
+        </Paper>
       )}
 
       {/* Loading state */}
       {isLoading && (
-        <div className="h-48 flex items-center justify-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500" />
-        </div>
+        <Center h={192}>
+          <Loader color="blue" size="md" />
+        </Center>
       )}
 
       {/* Error state */}
       {error && (
-        <div className="h-48 flex items-center justify-center text-red-400 text-sm">
-          Failed to load data
-        </div>
+        <Center h={192}>
+          <Text c="red.4" size="sm">Failed to load data</Text>
+        </Center>
       )}
 
       {/* Chart */}
       {!isLoading && !error && chartData.length > 0 && (
         <>
-          <div className="h-48">
+          <Box h={192}>
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={chartData} margin={{ top: 5, right: 5, bottom: 5, left: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
@@ -141,7 +174,7 @@ export function Timeseries({ lat, lon, onClose }: TimeseriesProps) {
                 />
                 <YAxis
                   tick={{ fontSize: 10, fill: '#94a3b8' }}
-                  tickFormatter={(value) => `${value.toFixed(0)}°C`}
+                  tickFormatter={(value) => `${value.toFixed(0)} ${displayUnits}`}
                   stroke="#475569"
                   domain={['auto', 'auto']}
                 />
@@ -154,11 +187,11 @@ export function Timeseries({ lat, lon, onClose }: TimeseriesProps) {
                   }}
                   labelStyle={{ color: '#94a3b8' }}
                   labelFormatter={(value) => formatMonth(value as string)}
-                  formatter={(value: number) => [`${value.toFixed(1)}°C`, 'Temperature']}
+                  formatter={(value: number) => [`${value.toFixed(1)} ${displayUnits}`, variableName]}
                 />
                 <Line
                   type="monotone"
-                  dataKey="valueCelsius"
+                  dataKey="displayValue"
                   stroke="#3b82f6"
                   strokeWidth={2}
                   dot={false}
@@ -186,48 +219,49 @@ export function Timeseries({ lat, lon, onClose }: TimeseriesProps) {
                 )}
               </LineChart>
             </ResponsiveContainer>
-          </div>
+          </Box>
 
           {/* Trend info */}
           {trend && (
-            <div className="mt-3 pt-3 border-t border-slate-700">
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-slate-400">Trend:</span>
-                <span
-                  className={`text-xs font-medium ${
-                    trend.slope > 0 ? 'text-red-400' : 'text-blue-400'
-                  }`}
+            <>
+              <Divider my="sm" color="dark.5" />
+              <Flex align="center" gap="xs">
+                <Text size="xs" c="dimmed">Trend:</Text>
+                <Text
+                  size="xs"
+                  fw={500}
+                  c={trend.slope > 0 ? 'red.4' : 'blue.4'}
                 >
                   {trend.slope > 0 ? '+' : ''}
-                  {(trend.slope * 10).toFixed(2)} °C/decade
-                </span>
+                  {(trend.slope * 10).toFixed(2)} {displayUnits}/decade
+                </Text>
                 {trend.significant && (
-                  <span className="text-xs text-green-400">(significant)</span>
+                  <Badge size="xs" color="green" variant="light">significant</Badge>
                 )}
-              </div>
-            </div>
+              </Flex>
+            </>
           )}
 
           {/* Screen reader summary */}
-          <div className="sr-only">
-            Temperature timeseries showing {chartData.length} data points.
-            Current value: {currentValue?.toFixed(1)} degrees Celsius.
+          <Box style={{ position: 'absolute', left: -9999, width: 1, height: 1, overflow: 'hidden' }}>
+            {variableName} timeseries showing {chartData.length} data points.
+            Current value: {currentValue?.toFixed(1)} {displayUnits}.
             {trend && (
               <>
-                Linear trend: {formatValueForScreenReader(trend.slope * 10, 'degrees Celsius per decade')}.
+                Linear trend: {formatValueForScreenReader(trend.slope * 10, `${displayUnits} per decade`)}.
                 {trend.significant ? ' This trend is statistically significant.' : ''}
               </>
             )}
-          </div>
+          </Box>
         </>
       )}
 
       {/* No data state */}
       {!isLoading && !error && chartData.length === 0 && (
-        <div className="h-48 flex items-center justify-center text-slate-400 text-sm">
-          No data available for this location
-        </div>
+        <Center h={192}>
+          <Text c="dimmed" size="sm">No data available for this location</Text>
+        </Center>
       )}
-    </div>
+    </Paper>
   );
 }
