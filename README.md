@@ -2,6 +2,14 @@
 
 React/TypeScript interactive climate data visualisation with 3D globe, 2D maps, and timeseries charts.
 
+## Live Demo
+
+**[https://climate-viz-frontend.vercel.app](https://climate-viz-frontend.vercel.app)** - Interactive visualisation
+
+See also:
+- [ARCO Demo](https://arco-demo.vercel.app) - Full demonstration
+- [Climate Data Pipeline](https://climate-data-pipeline.vercel.app) - API endpoints
+
 ## Features
 
 - **3D Globe**: CesiumJS landing view with global climate data overlay
