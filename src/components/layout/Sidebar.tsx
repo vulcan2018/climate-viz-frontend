@@ -1,7 +1,9 @@
 /**
  * Sidebar with layer controls, data selection, and analysis tools.
+ * Migrated to Mantine UI per ECMWF requirements.
  */
 
+import { Box, Flex, Tabs, Text, Title, Card, Stack, Button, ActionIcon, ScrollArea, Loader } from '@mantine/core';
 import { useUIStore } from '../../stores/uiStore';
 import { useDataStore } from '../../stores/dataStore';
 import { useDatasets } from '../../hooks/useClimateData';
@@ -21,14 +23,25 @@ export function Sidebar({ isOpen, onToggle }: SidebarProps) {
   return (
     <>
       {/* Toggle button */}
-      <button
-        className="absolute top-20 left-0 z-20 bg-slate-800 border border-slate-700 rounded-r-md p-2 text-slate-400 hover:text-white transition-colors"
+      <ActionIcon
+        variant="filled"
+        color="dark.7"
+        size="lg"
+        pos="absolute"
+        top={80}
+        left={0}
+        style={{ zIndex: 20, borderRadius: '0 8px 8px 0' }}
         onClick={onToggle}
         aria-label={isOpen ? 'Close sidebar' : 'Open sidebar'}
         aria-expanded={isOpen}
       >
         <svg
-          className={`w-5 h-5 transition-transform ${isOpen ? 'rotate-180' : ''}`}
+          style={{
+            width: 20,
+            height: 20,
+            transform: isOpen ? 'rotate(180deg)' : 'none',
+            transition: 'transform 0.2s'
+          }}
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
@@ -40,145 +53,112 @@ export function Sidebar({ isOpen, onToggle }: SidebarProps) {
             d="M9 5l7 7-7 7"
           />
         </svg>
-      </button>
+      </ActionIcon>
 
       {/* Sidebar panel */}
-      <aside
-        className={`bg-slate-900 border-r border-slate-700 w-80 flex-shrink-0 transition-all duration-300 overflow-hidden ${
-          isOpen ? 'translate-x-0' : '-translate-x-full w-0'
-        }`}
+      <Box
+        component="aside"
+        bg="dark.9"
+        w={isOpen ? 320 : 0}
+        style={{
+          flexShrink: 0,
+          transition: 'width 0.3s',
+          overflow: 'hidden',
+          borderRight: isOpen ? '1px solid var(--mantine-color-dark-6)' : 'none'
+        }}
         role="complementary"
         aria-label="Controls panel"
       >
-        <div className="h-full flex flex-col">
+        <Flex direction="column" h="100%">
           {/* Tabs */}
-          <div className="flex border-b border-slate-700" role="tablist">
-            {(['layers', 'data', 'analysis'] as const).map((tab) => (
-              <button
-                key={tab}
-                className={`flex-1 px-4 py-3 text-sm font-medium capitalize transition-colors ${
-                  sidebarTab === tab
-                    ? 'text-white border-b-2 border-blue-500'
-                    : 'text-slate-400 hover:text-white'
-                }`}
-                onClick={() => setSidebarTab(tab)}
-                role="tab"
-                aria-selected={sidebarTab === tab}
-                aria-controls={`${tab}-panel`}
-              >
-                {tab}
-              </button>
-            ))}
-          </div>
+          <Tabs value={sidebarTab} onChange={(v) => setSidebarTab(v as 'layers' | 'data' | 'analysis')}>
+            <Tabs.List>
+              <Tabs.Tab value="layers" style={{ flex: 1 }}>Layers</Tabs.Tab>
+              <Tabs.Tab value="data" style={{ flex: 1 }}>Data</Tabs.Tab>
+              <Tabs.Tab value="analysis" style={{ flex: 1 }}>Analysis</Tabs.Tab>
+            </Tabs.List>
 
-          {/* Tab content */}
-          <div className="flex-1 overflow-y-auto scrollbar-thin p-4">
-            {sidebarTab === 'layers' && (
-              <div
-                id="layers-panel"
-                role="tabpanel"
-                aria-labelledby="layers-tab"
-              >
-                <h2 className="text-sm font-semibold text-slate-300 mb-3">
+            <ScrollArea flex={1} p="md" className="scrollbar-thin">
+              <Tabs.Panel value="layers">
+                <Title order={6} c="dimmed" mb="sm">
                   Visualization Settings
-                </h2>
-
-                <div className="space-y-6">
+                </Title>
+                <Stack gap="lg">
                   <ColormapSelector />
                   <ValueRange />
-                </div>
-              </div>
-            )}
+                </Stack>
+              </Tabs.Panel>
 
-            {sidebarTab === 'data' && (
-              <div
-                id="data-panel"
-                role="tabpanel"
-                aria-labelledby="data-tab"
-              >
-                <h2 className="text-sm font-semibold text-slate-300 mb-3">
+              <Tabs.Panel value="data">
+                <Title order={6} c="dimmed" mb="sm">
                   Select Dataset
-                </h2>
-
+                </Title>
                 {isLoading ? (
-                  <p className="text-slate-400 text-sm">Loading datasets...</p>
+                  <Flex justify="center" py="md">
+                    <Loader size="sm" />
+                  </Flex>
                 ) : (
-                  <div className="space-y-2">
+                  <Stack gap="xs">
                     {datasets?.map((dataset) => (
-                      <button
+                      <Button
                         key={dataset.id}
-                        className={`w-full text-left p-3 rounded-lg transition-colors ${
-                          selectedDatasetId === dataset.id
-                            ? 'bg-blue-600 text-white'
-                            : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
-                        }`}
+                        variant={selectedDatasetId === dataset.id ? 'filled' : 'subtle'}
+                        color={selectedDatasetId === dataset.id ? 'blue' : 'gray'}
+                        fullWidth
+                        styles={{
+                          root: { height: 'auto', padding: '12px' },
+                          inner: { flexDirection: 'column', alignItems: 'flex-start' }
+                        }}
                         onClick={() => selectDataset(dataset.id)}
                         aria-pressed={selectedDatasetId === dataset.id}
                       >
-                        <div className="font-medium">{dataset.name}</div>
-                        <div className="text-sm opacity-75">
+                        <Text fw={500}>{dataset.name}</Text>
+                        <Text size="xs" c={selectedDatasetId === dataset.id ? 'white' : 'dimmed'}>
                           {dataset.variable} ({dataset.units})
-                        </div>
-                      </button>
+                        </Text>
+                      </Button>
                     ))}
-                  </div>
+                  </Stack>
                 )}
-              </div>
-            )}
+              </Tabs.Panel>
 
-            {sidebarTab === 'analysis' && (
-              <div
-                id="analysis-panel"
-                role="tabpanel"
-                aria-labelledby="analysis-tab"
-              >
-                <h2 className="text-sm font-semibold text-slate-300 mb-3">
+              <Tabs.Panel value="analysis">
+                <Title order={6} c="dimmed" mb="sm">
                   Analysis Tools
-                </h2>
-
-                <div className="space-y-4">
-                  <div className="p-3 bg-slate-800 rounded-lg">
-                    <h3 className="font-medium text-white mb-1">
-                      Point Analysis
-                    </h3>
-                    <p className="text-sm text-slate-400">
+                </Title>
+                <Stack gap="sm">
+                  <Card bg="dark.7" padding="md" radius="md">
+                    <Title order={6} c="white" mb="xs">Point Analysis</Title>
+                    <Text size="sm" c="dimmed">
                       Click on the map to select a point and view its timeseries.
-                    </p>
-                  </div>
+                    </Text>
+                  </Card>
 
-                  <div className="p-3 bg-slate-800 rounded-lg">
-                    <h3 className="font-medium text-white mb-1">
-                      Regional Statistics
-                    </h3>
-                    <p className="text-sm text-slate-400">
+                  <Card bg="dark.7" padding="md" radius="md">
+                    <Title order={6} c="white" mb="xs">Regional Statistics</Title>
+                    <Text size="sm" c="dimmed">
                       Draw a region to compute spatial statistics.
-                    </p>
-                  </div>
+                    </Text>
+                  </Card>
 
-                  <div className="p-3 bg-slate-800 rounded-lg">
-                    <h3 className="font-medium text-white mb-1">
-                      Trend Analysis
-                    </h3>
-                    <p className="text-sm text-slate-400">
+                  <Card bg="dark.7" padding="md" radius="md">
+                    <Title order={6} c="white" mb="xs">Trend Analysis</Title>
+                    <Text size="sm" c="dimmed">
                       Compute linear trends with statistical significance.
-                    </p>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
+                    </Text>
+                  </Card>
+                </Stack>
+              </Tabs.Panel>
+            </ScrollArea>
+          </Tabs>
 
           {/* Footer */}
-          <div className="border-t border-slate-700 p-4">
-            <p className="text-xs text-slate-500">
-              Data: ERA5 Reanalysis
-            </p>
-            <p className="text-xs text-slate-500">
-              Built by FIRA Software Ltd
-            </p>
-          </div>
-        </div>
-      </aside>
+          <Box p="md" style={{ borderTop: '1px solid var(--mantine-color-dark-6)' }}>
+            <Text size="xs" c="dimmed">Data: ERA5 Reanalysis</Text>
+            <Text size="xs" c="dimmed">Built by FIRA Software Ltd</Text>
+          </Box>
+        </Flex>
+      </Box>
     </>
   );
 }

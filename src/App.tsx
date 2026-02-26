@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect, Suspense, lazy } from 'react';
+import { Box, Flex, Center, Loader, Text } from '@mantine/core';
 import { Header } from './components/layout/Header';
 import { Sidebar } from './components/layout/Sidebar';
 import { TimelineSlider } from './components/controls/TimelineSlider';
@@ -16,9 +17,12 @@ type ViewMode = '3d' | '2d';
 
 function LoadingFallback() {
   return (
-    <div className="w-full h-full flex items-center justify-center bg-slate-900">
-      <div className="text-white">Loading...</div>
-    </div>
+    <Center w="100%" h="100%" bg="dark.8">
+      <Flex direction="column" align="center" gap="sm">
+        <Loader color="blue" size="lg" />
+        <Text c="dimmed">Loading...</Text>
+      </Flex>
+    </Center>
   );
 }
 
@@ -51,7 +55,7 @@ function App() {
   );
 
   return (
-    <div className="h-full flex flex-col bg-slate-900">
+    <Flex direction="column" h="100%" bg="dark.8">
       {/* Skip link for keyboard accessibility */}
       <a href="#main-content" className="skip-link">
         Skip to main content
@@ -59,19 +63,21 @@ function App() {
 
       <Header viewMode={viewMode} onViewModeChange={setViewMode} />
 
-      <div className="flex-1 flex overflow-hidden">
+      <Flex flex={1} style={{ overflow: 'hidden' }}>
         {/* Sidebar */}
         <Sidebar isOpen={sidebarOpen} onToggle={toggleSidebar} />
 
         {/* Main content */}
-        <main
+        <Box
+          component="main"
           id="main-content"
-          className="flex-1 relative"
+          flex={1}
+          pos="relative"
           role="main"
           aria-label="Climate data visualization"
         >
           {/* Map/Globe view */}
-          <div className="absolute inset-0">
+          <Box pos="absolute" top={0} left={0} right={0} bottom={0}>
             <Suspense fallback={<LoadingFallback />}>
               {viewMode === '3d' ? (
                 <CesiumGlobe onPointSelect={handlePointSelect} />
@@ -79,16 +85,24 @@ function App() {
                 <DeckGLMap onPointSelect={handlePointSelect} />
               )}
             </Suspense>
-          </div>
+          </Box>
 
           {/* Timeline control */}
-          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 w-full max-w-2xl px-4 z-[1000]">
+          <Box
+            pos="absolute"
+            bottom={16}
+            left="50%"
+            w="100%"
+            maw="42rem"
+            px="md"
+            style={{ transform: 'translateX(-50%)', zIndex: 1000 }}
+          >
             <TimelineSlider />
-          </div>
+          </Box>
 
           {/* Timeseries chart (when point selected) */}
           {selectedPoint && (
-            <div className="absolute top-4 right-4 w-96 z-[1000]">
+            <Box pos="absolute" top={16} right={16} w={384} style={{ zIndex: 1000 }}>
               <Suspense fallback={<LoadingFallback />}>
                 <Timeseries
                   lat={selectedPoint.lat}
@@ -96,11 +110,11 @@ function App() {
                   onClose={() => setSelectedPoint(null)}
                 />
               </Suspense>
-            </div>
+            </Box>
           )}
-        </main>
-      </div>
-    </div>
+        </Box>
+      </Flex>
+    </Flex>
   );
 }
 
