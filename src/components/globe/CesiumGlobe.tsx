@@ -69,6 +69,7 @@ function temperatureToColor(tempK: number): [number, number, number] {
 }
 
 // Create temperature overlay canvas
+// Rearranges data from 0-360 longitude to -180 to 180 for Cesium
 function createTemperatureCanvas(
   era5Data: ERA5Data,
   year: number,
@@ -94,9 +95,27 @@ function createTemperatureCanvas(
 
   const imageData = ctx.createImageData(width, height);
 
+  // ERA5 lons are 0, 5, 10, ..., 355 (72 points at 5° spacing)
+  // We need to rearrange so 180-355 comes first (becomes -180 to -5)
+  // then 0-175 (stays as 0 to 175)
+  // Find the split point: index where lon >= 180
+  const splitIndex = era5Data.lons.findIndex(lon => lon >= 180);
+
   for (let latIdx = 0; latIdx < height; latIdx++) {
     for (let lonIdx = 0; lonIdx < width; lonIdx++) {
-      const temp = grid[latIdx][lonIdx];
+      // Remap longitude index:
+      // Output 0 -> Input splitIndex (180°)
+      // Output (width-splitIndex) -> Input 0 (0°)
+      let srcLonIdx: number;
+      if (lonIdx < width - splitIndex) {
+        // First part of output: from 180° to 355° (indices splitIndex to end)
+        srcLonIdx = splitIndex + lonIdx;
+      } else {
+        // Second part of output: from 0° to 175° (indices 0 to splitIndex-1)
+        srcLonIdx = lonIdx - (width - splitIndex);
+      }
+
+      const temp = grid[latIdx][srcLonIdx];
       const [r, g, b] = temperatureToColor(temp);
 
       const pixelIdx = (latIdx * width + lonIdx) * 4;
@@ -202,8 +221,8 @@ export function CesiumGlobe({ onPointSelect }: CesiumGlobeProps) {
     // Create imagery provider from canvas
     const imageUrl = canvas.toDataURL();
 
-    // ERA5 data spans: lons 0-355 (5 degree spacing), lats 90 to -90
-    const rectangle = Rectangle.fromDegrees(-2.5, -90, 357.5, 90);
+    // ERA5 data rearranged to span -180 to 180, lats 90 to -90
+    const rectangle = Rectangle.fromDegrees(-180, -90, 180, 90);
 
     const provider = new SingleTileImageryProvider({
       url: imageUrl,
