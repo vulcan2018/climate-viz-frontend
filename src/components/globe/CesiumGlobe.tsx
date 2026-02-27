@@ -1,17 +1,21 @@
 /**
  * 3D Globe visualization using CesiumJS directly (no Resium).
+ * Includes temperature data overlay from ERA5.
  */
 
-import { useRef, useEffect } from 'react';
+import { useRef, useEffect, useState } from 'react';
 import {
   Viewer,
   Cartesian2,
   Cartesian3,
   ScreenSpaceEventType,
   UrlTemplateImageryProvider,
+  SingleTileImageryProvider,
   Math as CesiumMath,
   Color,
   ScreenSpaceEventHandler,
+  Rectangle,
+  ImageryLayer,
 } from 'cesium';
 import 'cesium/Build/Cesium/Widgets/widgets.css';
 import { useMapStore } from '../../stores/mapStore';
@@ -21,11 +25,107 @@ interface CesiumGlobeProps {
   onPointSelect: (lat: number, lon: number) => void;
 }
 
+interface ERA5Data {
+  lats: number[];
+  lons: number[];
+  years: {
+    [year: string]: {
+      [month: string]: number[][];
+    };
+  };
+}
+
+// Color scale: blue (cold) -> cyan -> green -> yellow -> red (hot)
+function temperatureToColor(tempK: number): [number, number, number] {
+  const minTemp = 220;
+  const maxTemp = 320;
+  const normalized = Math.max(0, Math.min(1, (tempK - minTemp) / (maxTemp - minTemp)));
+
+  let r: number, g: number, b: number;
+
+  if (normalized < 0.25) {
+    const t = normalized / 0.25;
+    r = 0;
+    g = Math.round(255 * t);
+    b = 255;
+  } else if (normalized < 0.5) {
+    const t = (normalized - 0.25) / 0.25;
+    r = 0;
+    g = 255;
+    b = Math.round(255 * (1 - t));
+  } else if (normalized < 0.75) {
+    const t = (normalized - 0.5) / 0.25;
+    r = Math.round(255 * t);
+    g = 255;
+    b = 0;
+  } else {
+    const t = (normalized - 0.75) / 0.25;
+    r = 255;
+    g = Math.round(255 * (1 - t));
+    b = 0;
+  }
+
+  return [r, g, b];
+}
+
+// Create temperature overlay canvas
+function createTemperatureCanvas(
+  era5Data: ERA5Data,
+  year: number,
+  month: number
+): HTMLCanvasElement | null {
+  const yearStr = String(year);
+  const monthStr = String(month).padStart(2, '0');
+
+  if (!era5Data.years[yearStr] || !era5Data.years[yearStr][monthStr]) {
+    return null;
+  }
+
+  const grid = era5Data.years[yearStr][monthStr];
+  const width = era5Data.lons.length;
+  const height = era5Data.lats.length;
+
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return null;
+
+  const imageData = ctx.createImageData(width, height);
+
+  for (let latIdx = 0; latIdx < height; latIdx++) {
+    for (let lonIdx = 0; lonIdx < width; lonIdx++) {
+      const temp = grid[latIdx][lonIdx];
+      const [r, g, b] = temperatureToColor(temp);
+
+      const pixelIdx = (latIdx * width + lonIdx) * 4;
+      imageData.data[pixelIdx] = r;
+      imageData.data[pixelIdx + 1] = g;
+      imageData.data[pixelIdx + 2] = b;
+      imageData.data[pixelIdx + 3] = temp ? 180 : 0; // Semi-transparent
+    }
+  }
+
+  ctx.putImageData(imageData, 0, 0);
+  return canvas;
+}
+
 export function CesiumGlobe({ onPointSelect }: CesiumGlobeProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const viewerRef = useRef<Viewer | null>(null);
   const entityRef = useRef<any>(null);
-  const { selectedPoint } = useMapStore();
+  const temperatureLayerRef = useRef<ImageryLayer | null>(null);
+  const { selectedPoint, animation } = useMapStore();
+  const [era5Data, setEra5Data] = useState<ERA5Data | null>(null);
+
+  // Load ERA5 data
+  useEffect(() => {
+    fetch('/data/era5_t2m_sampled.json')
+      .then((res) => res.json())
+      .then((data) => setEra5Data(data))
+      .catch((err) => console.error('Failed to load ERA5 data:', err));
+  }, []);
 
   // Initialize Cesium viewer
   useEffect(() => {
@@ -78,6 +178,50 @@ export function CesiumGlobe({ onPointSelect }: CesiumGlobeProps) {
       }
     };
   }, []);
+
+  // Update temperature overlay when animation time or data changes
+  useEffect(() => {
+    const viewer = viewerRef.current;
+    if (!viewer || !era5Data) return;
+
+    // Get current year and month from animation
+    const currentDate = new Date(animation.currentTime);
+    const year = Math.max(2020, Math.min(2024, currentDate.getFullYear()));
+    const month = currentDate.getMonth() + 1;
+
+    // Create temperature canvas
+    const canvas = createTemperatureCanvas(era5Data, year, month);
+    if (!canvas) return;
+
+    // Remove existing temperature layer
+    if (temperatureLayerRef.current) {
+      viewer.imageryLayers.remove(temperatureLayerRef.current);
+      temperatureLayerRef.current = null;
+    }
+
+    // Create imagery provider from canvas
+    const imageUrl = canvas.toDataURL();
+
+    // ERA5 data spans: lons 0-355 (5 degree spacing), lats 90 to -90
+    const rectangle = Rectangle.fromDegrees(-2.5, -90, 357.5, 90);
+
+    const provider = new SingleTileImageryProvider({
+      url: imageUrl,
+      rectangle: rectangle,
+    });
+
+    // Add as imagery layer with transparency
+    const layer = viewer.imageryLayers.addImageryProvider(provider);
+    layer.alpha = 0.7;
+    temperatureLayerRef.current = layer;
+
+    return () => {
+      if (temperatureLayerRef.current && viewer && !viewer.isDestroyed()) {
+        viewer.imageryLayers.remove(temperatureLayerRef.current);
+        temperatureLayerRef.current = null;
+      }
+    };
+  }, [era5Data, animation.currentTime]);
 
   // Set up click handler
   useEffect(() => {
