@@ -1,3 +1,7 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
 :root {
   --color-cold: #2166ac;
   --color-cool: #67a9cf;
