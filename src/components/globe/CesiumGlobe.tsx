@@ -182,7 +182,7 @@ function createClimateCanvas(
       imageData.data[pixelIdx] = r;
       imageData.data[pixelIdx + 1] = g;
       imageData.data[pixelIdx + 2] = b;
-      imageData.data[pixelIdx + 3] = value ? 180 : 0;
+      imageData.data[pixelIdx + 3] = 180; // Always show overlay
     }
   }
 
