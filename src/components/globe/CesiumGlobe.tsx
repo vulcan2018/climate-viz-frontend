@@ -53,7 +53,7 @@ const DATASET_CONFIG: Record<string, {
   'era5-precip': {
     file: '/data/era5_tp_sampled.json',
     minValue: 0,
-    maxValue: 0.02,
+    maxValue: 0.008,
     colorScale: 'precipitation',
   },
   'cams-ozone': {
@@ -91,27 +91,22 @@ function valueToColor(
       r = 255; g = Math.round(255 * (1 - t)); b = 0;
     }
   } else if (colorScale === 'precipitation') {
-    // White -> Light Blue -> Blue -> Dark Blue -> Purple
-    if (normalized < 0.25) {
-      const t = normalized / 0.25;
-      r = Math.round(255 * (1 - t * 0.3));
-      g = Math.round(255 * (1 - t * 0.1));
+    // Light cyan -> Blue -> Dark blue -> Purple (more vivid)
+    if (normalized < 0.33) {
+      const t = normalized / 0.33;
+      r = Math.round(200 * (1 - t));
+      g = Math.round(255 * (1 - t * 0.3));
       b = 255;
-    } else if (normalized < 0.5) {
-      const t = (normalized - 0.25) / 0.25;
-      r = Math.round(178 * (1 - t));
-      g = Math.round(230 * (1 - t * 0.5));
+    } else if (normalized < 0.66) {
+      const t = (normalized - 0.33) / 0.33;
+      r = 0;
+      g = Math.round(180 * (1 - t));
       b = 255;
-    } else if (normalized < 0.75) {
-      const t = (normalized - 0.5) / 0.25;
-      r = Math.round(0 + t * 75);
-      g = Math.round(115 * (1 - t));
-      b = Math.round(255 * (1 - t * 0.3));
     } else {
-      const t = (normalized - 0.75) / 0.25;
-      r = Math.round(75 + t * 65);
+      const t = (normalized - 0.66) / 0.34;
+      r = Math.round(100 * t);
       g = 0;
-      b = Math.round(178 + t * 40);
+      b = Math.round(255 - t * 55);
     }
   } else {
     // Ozone: Purple -> Blue -> Cyan -> Green -> Yellow
