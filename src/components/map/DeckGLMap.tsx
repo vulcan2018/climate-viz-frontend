@@ -9,7 +9,7 @@ import { useMapStore } from '../../stores/mapStore';
 import { useUIStore } from '../../stores/uiStore';
 import { MapProjection } from './MapProjection';
 import { LayerControls } from './LayerControls';
-import { TemperatureLayer } from './TemperatureLayer';
+import { ClimateDataLayer } from './ClimateDataLayer';
 import { announceToScreenReader, formatCoordinatesForScreenReader } from '../../utils/accessibility';
 
 interface DeckGLMapProps {
@@ -71,8 +71,8 @@ export function DeckGLMap({ onPointSelect }: DeckGLMapProps) {
           maxZoom={19}
         />
 
-        {/* Temperature overlay from ERA5 data */}
-        <TemperatureLayer
+        {/* Climate data overlay - responds to dataset selection */}
+        <ClimateDataLayer
           opacity={temperatureOpacity}
           visible={showTemperature}
         />

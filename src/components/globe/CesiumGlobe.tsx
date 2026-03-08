@@ -1,9 +1,9 @@
 /**
- * 3D Globe visualization using CesiumJS directly (no Resium).
- * Includes temperature data overlay from ERA5.
+ * 3D Globe visualization using CesiumJS with climate data overlay.
+ * Supports dataset switching (temperature, precipitation, ozone).
  */
 
-import { useRef, useEffect, useState } from 'react';
+import { useRef, useEffect, useState, useCallback } from 'react';
 import {
   Viewer,
   Cartesian2,
@@ -19,13 +19,15 @@ import {
 } from 'cesium';
 import 'cesium/Build/Cesium/Widgets/widgets.css';
 import { useMapStore } from '../../stores/mapStore';
+import { useDataStore } from '../../stores/dataStore';
+import { useUIStore } from '../../stores/uiStore';
 import { announceToScreenReader, formatCoordinatesForScreenReader } from '../../utils/accessibility';
 
 interface CesiumGlobeProps {
   onPointSelect: (lat: number, lon: number) => void;
 }
 
-interface ERA5Data {
+interface ClimateData {
   lats: number[];
   lons: number[];
   years: {
@@ -35,56 +37,133 @@ interface ERA5Data {
   };
 }
 
-// Color scale: blue (cold) -> cyan -> green -> yellow -> red (hot)
-function temperatureToColor(tempK: number): [number, number, number] {
-  const minTemp = 220;
-  const maxTemp = 320;
-  const normalized = Math.max(0, Math.min(1, (tempK - minTemp) / (maxTemp - minTemp)));
+// Dataset configurations
+const DATASET_CONFIG: Record<string, {
+  file: string;
+  minValue: number;
+  maxValue: number;
+  colorScale: 'temperature' | 'precipitation' | 'ozone';
+}> = {
+  'era5-t2m': {
+    file: '/data/era5_t2m_sampled.json',
+    minValue: 220,
+    maxValue: 320,
+    colorScale: 'temperature',
+  },
+  '2m_temperature': {
+    file: '/data/era5_t2m_sampled.json',
+    minValue: 220,
+    maxValue: 320,
+    colorScale: 'temperature',
+  },
+  'total_precipitation': {
+    file: '/data/era5_tp_sampled.json',
+    minValue: 0,
+    maxValue: 0.02,
+    colorScale: 'precipitation',
+  },
+  'total_column_ozone': {
+    file: '/data/cams_ozone_sampled.json',
+    minValue: 200,
+    maxValue: 500,
+    colorScale: 'ozone',
+  },
+};
+
+// Color scales for different variables
+function valueToColor(
+  value: number,
+  minValue: number,
+  maxValue: number,
+  colorScale: 'temperature' | 'precipitation' | 'ozone'
+): [number, number, number] {
+  const normalized = Math.max(0, Math.min(1, (value - minValue) / (maxValue - minValue)));
 
   let r: number, g: number, b: number;
 
-  if (normalized < 0.25) {
-    const t = normalized / 0.25;
-    r = 0;
-    g = Math.round(255 * t);
-    b = 255;
-  } else if (normalized < 0.5) {
-    const t = (normalized - 0.25) / 0.25;
-    r = 0;
-    g = 255;
-    b = Math.round(255 * (1 - t));
-  } else if (normalized < 0.75) {
-    const t = (normalized - 0.5) / 0.25;
-    r = Math.round(255 * t);
-    g = 255;
-    b = 0;
+  if (colorScale === 'temperature') {
+    // Blue -> Cyan -> Green -> Yellow -> Red
+    if (normalized < 0.25) {
+      const t = normalized / 0.25;
+      r = 0; g = Math.round(255 * t); b = 255;
+    } else if (normalized < 0.5) {
+      const t = (normalized - 0.25) / 0.25;
+      r = 0; g = 255; b = Math.round(255 * (1 - t));
+    } else if (normalized < 0.75) {
+      const t = (normalized - 0.5) / 0.25;
+      r = Math.round(255 * t); g = 255; b = 0;
+    } else {
+      const t = (normalized - 0.75) / 0.25;
+      r = 255; g = Math.round(255 * (1 - t)); b = 0;
+    }
+  } else if (colorScale === 'precipitation') {
+    // White -> Light Blue -> Blue -> Dark Blue -> Purple
+    if (normalized < 0.25) {
+      const t = normalized / 0.25;
+      r = Math.round(255 * (1 - t * 0.3));
+      g = Math.round(255 * (1 - t * 0.1));
+      b = 255;
+    } else if (normalized < 0.5) {
+      const t = (normalized - 0.25) / 0.25;
+      r = Math.round(178 * (1 - t));
+      g = Math.round(230 * (1 - t * 0.5));
+      b = 255;
+    } else if (normalized < 0.75) {
+      const t = (normalized - 0.5) / 0.25;
+      r = Math.round(0 + t * 75);
+      g = Math.round(115 * (1 - t));
+      b = Math.round(255 * (1 - t * 0.3));
+    } else {
+      const t = (normalized - 0.75) / 0.25;
+      r = Math.round(75 + t * 65);
+      g = 0;
+      b = Math.round(178 + t * 40);
+    }
   } else {
-    const t = (normalized - 0.75) / 0.25;
-    r = 255;
-    g = Math.round(255 * (1 - t));
-    b = 0;
+    // Ozone: Purple -> Blue -> Cyan -> Green -> Yellow
+    if (normalized < 0.25) {
+      const t = normalized / 0.25;
+      r = Math.round(128 * (1 - t));
+      g = 0;
+      b = Math.round(128 + t * 127);
+    } else if (normalized < 0.5) {
+      const t = (normalized - 0.25) / 0.25;
+      r = 0;
+      g = Math.round(255 * t);
+      b = 255;
+    } else if (normalized < 0.75) {
+      const t = (normalized - 0.5) / 0.25;
+      r = 0;
+      g = 255;
+      b = Math.round(255 * (1 - t));
+    } else {
+      const t = (normalized - 0.75) / 0.25;
+      r = Math.round(255 * t);
+      g = 255;
+      b = 0;
+    }
   }
 
   return [r, g, b];
 }
 
-// Create temperature overlay canvas
-// Rearranges data from 0-360 longitude to -180 to 180 for Cesium
-function createTemperatureCanvas(
-  era5Data: ERA5Data,
+// Create climate overlay canvas with longitude rearrangement for Cesium
+function createClimateCanvas(
+  climateData: ClimateData,
   year: number,
-  month: number
+  month: number,
+  config: { minValue: number; maxValue: number; colorScale: 'temperature' | 'precipitation' | 'ozone' }
 ): HTMLCanvasElement | null {
   const yearStr = String(year);
   const monthStr = String(month).padStart(2, '0');
 
-  if (!era5Data.years[yearStr] || !era5Data.years[yearStr][monthStr]) {
+  if (!climateData.years[yearStr] || !climateData.years[yearStr][monthStr]) {
     return null;
   }
 
-  const grid = era5Data.years[yearStr][monthStr];
-  const width = era5Data.lons.length;
-  const height = era5Data.lats.length;
+  const grid = climateData.years[yearStr][monthStr];
+  const width = climateData.lons.length;
+  const height = climateData.lats.length;
 
   const canvas = document.createElement('canvas');
   canvas.width = width;
@@ -95,34 +174,26 @@ function createTemperatureCanvas(
 
   const imageData = ctx.createImageData(width, height);
 
-  // ERA5 lons are 0, 5, 10, ..., 355 (72 points at 5° spacing)
-  // We need to rearrange so 180-355 comes first (becomes -180 to -5)
-  // then 0-175 (stays as 0 to 175)
-  // Find the split point: index where lon >= 180
-  const splitIndex = era5Data.lons.findIndex(lon => lon >= 180);
+  // Rearrange longitude: 0-360 to -180 to 180
+  const splitIndex = climateData.lons.findIndex(lon => lon >= 180);
 
   for (let latIdx = 0; latIdx < height; latIdx++) {
     for (let lonIdx = 0; lonIdx < width; lonIdx++) {
-      // Remap longitude index:
-      // Output 0 -> Input splitIndex (180°)
-      // Output (width-splitIndex) -> Input 0 (0°)
       let srcLonIdx: number;
       if (lonIdx < width - splitIndex) {
-        // First part of output: from 180° to 355° (indices splitIndex to end)
         srcLonIdx = splitIndex + lonIdx;
       } else {
-        // Second part of output: from 0° to 175° (indices 0 to splitIndex-1)
         srcLonIdx = lonIdx - (width - splitIndex);
       }
 
-      const temp = grid[latIdx][srcLonIdx];
-      const [r, g, b] = temperatureToColor(temp);
+      const value = grid[latIdx][srcLonIdx];
+      const [r, g, b] = valueToColor(value, config.minValue, config.maxValue, config.colorScale);
 
       const pixelIdx = (latIdx * width + lonIdx) * 4;
       imageData.data[pixelIdx] = r;
       imageData.data[pixelIdx + 1] = g;
       imageData.data[pixelIdx + 2] = b;
-      imageData.data[pixelIdx + 3] = temp ? 180 : 0; // Semi-transparent
+      imageData.data[pixelIdx + 3] = value ? 180 : 0;
     }
   }
 
@@ -134,17 +205,55 @@ export function CesiumGlobe({ onPointSelect }: CesiumGlobeProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const viewerRef = useRef<Viewer | null>(null);
   const entityRef = useRef<any>(null);
-  const temperatureLayerRef = useRef<ImageryLayer | null>(null);
+  const climateLayerRef = useRef<ImageryLayer | null>(null);
   const { selectedPoint, animation } = useMapStore();
-  const [era5Data, setEra5Data] = useState<ERA5Data | null>(null);
+  const { selectedDatasetId } = useDataStore();
+  const { showTemperature, temperatureOpacity } = useUIStore();
+  const [climateData, setClimateData] = useState<ClimateData | null>(null);
+  const [loadedDataset, setLoadedDataset] = useState<string | null>(null);
 
-  // Load ERA5 data
+  // Get config for current dataset
+  const config = DATASET_CONFIG[selectedDatasetId || 'era5-t2m'] || DATASET_CONFIG['era5-t2m'];
+
+  // Load climate data when dataset changes
   useEffect(() => {
-    fetch('/data/era5_t2m_sampled.json')
-      .then((res) => res.json())
-      .then((data) => setEra5Data(data))
-      .catch((err) => console.error('Failed to load ERA5 data:', err));
-  }, []);
+    const datasetId = selectedDatasetId || 'era5-t2m';
+    const dataConfig = DATASET_CONFIG[datasetId];
+
+    if (!dataConfig) {
+      console.warn(`No config for dataset: ${datasetId}`);
+      return;
+    }
+
+    // Skip if already loaded
+    if (loadedDataset === datasetId && climateData) return;
+
+    console.log(`Loading dataset: ${datasetId} from ${dataConfig.file}`);
+    setClimateData(null); // Clear while loading
+
+    fetch(dataConfig.file)
+      .then((res) => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.json();
+      })
+      .then((data) => {
+        console.log(`Loaded ${datasetId} data`);
+        setClimateData(data);
+        setLoadedDataset(datasetId);
+      })
+      .catch((err) => {
+        console.error(`Failed to load ${datasetId}:`, err);
+        // Fallback to temperature
+        if (datasetId !== 'era5-t2m') {
+          fetch('/data/era5_t2m_sampled.json')
+            .then((res) => res.json())
+            .then((data) => {
+              setClimateData(data);
+              setLoadedDataset('era5-t2m');
+            });
+        }
+      });
+  }, [selectedDatasetId, loadedDataset, climateData]);
 
   // Initialize Cesium viewer
   useEffect(() => {
@@ -161,17 +270,15 @@ export function CesiumGlobe({ onPointSelect }: CesiumGlobeProps) {
       navigationHelpButton: false,
       fullscreenButton: false,
       infoBox: false,
-      creditContainer: document.createElement('div'), // Hide credits
+      creditContainer: document.createElement('div'),
     });
 
     viewerRef.current = viewer;
 
-    // Configure globe appearance
     viewer.scene.globe.baseColor = Color.fromCssColorString('#0f172a');
     viewer.scene.globe.enableLighting = false;
     viewer.scene.globe.showGroundAtmosphere = true;
 
-    // Add dark basemap
     viewer.imageryLayers.removeAll();
     viewer.imageryLayers.addImageryProvider(
       new UrlTemplateImageryProvider({
@@ -181,15 +288,12 @@ export function CesiumGlobe({ onPointSelect }: CesiumGlobeProps) {
       })
     );
 
-    // Set initial view
     viewer.camera.setView({
       destination: Cartesian3.fromDegrees(0, 20, 20000000),
     });
 
-    // Disable default double-click zoom
     viewer.screenSpaceEventHandler.removeInputAction(ScreenSpaceEventType.LEFT_DOUBLE_CLICK);
 
-    // Cleanup on unmount
     return () => {
       if (viewerRef.current && !viewerRef.current.isDestroyed()) {
         viewerRef.current.destroy();
@@ -198,30 +302,32 @@ export function CesiumGlobe({ onPointSelect }: CesiumGlobeProps) {
     };
   }, []);
 
-  // Update temperature overlay when animation time or data changes
+  // Update climate overlay when data, dataset, or time changes
   useEffect(() => {
     const viewer = viewerRef.current;
-    if (!viewer || !era5Data) return;
+    if (!viewer || !climateData || !showTemperature) {
+      // Remove layer if not showing
+      if (climateLayerRef.current && viewer && !viewer.isDestroyed()) {
+        viewer.imageryLayers.remove(climateLayerRef.current);
+        climateLayerRef.current = null;
+      }
+      return;
+    }
 
-    // Get current year and month from animation
     const currentDate = new Date(animation.currentTime);
     const year = Math.max(2020, Math.min(2024, currentDate.getFullYear()));
     const month = currentDate.getMonth() + 1;
 
-    // Create temperature canvas
-    const canvas = createTemperatureCanvas(era5Data, year, month);
+    const canvas = createClimateCanvas(climateData, year, month, config);
     if (!canvas) return;
 
-    // Remove existing temperature layer
-    if (temperatureLayerRef.current) {
-      viewer.imageryLayers.remove(temperatureLayerRef.current);
-      temperatureLayerRef.current = null;
+    // Remove existing layer
+    if (climateLayerRef.current) {
+      viewer.imageryLayers.remove(climateLayerRef.current);
+      climateLayerRef.current = null;
     }
 
-    // Create imagery provider from canvas
     const imageUrl = canvas.toDataURL();
-
-    // ERA5 data rearranged to span -180 to 180, lats 90 to -90
     const rectangle = Rectangle.fromDegrees(-180, -90, 180, 90);
 
     const provider = new SingleTileImageryProvider({
@@ -229,18 +335,17 @@ export function CesiumGlobe({ onPointSelect }: CesiumGlobeProps) {
       rectangle: rectangle,
     });
 
-    // Add as imagery layer with transparency
     const layer = viewer.imageryLayers.addImageryProvider(provider);
-    layer.alpha = 0.7;
-    temperatureLayerRef.current = layer;
+    layer.alpha = temperatureOpacity;
+    climateLayerRef.current = layer;
 
     return () => {
-      if (temperatureLayerRef.current && viewer && !viewer.isDestroyed()) {
-        viewer.imageryLayers.remove(temperatureLayerRef.current);
-        temperatureLayerRef.current = null;
+      if (climateLayerRef.current && viewer && !viewer.isDestroyed()) {
+        viewer.imageryLayers.remove(climateLayerRef.current);
+        climateLayerRef.current = null;
       }
     };
-  }, [era5Data, animation.currentTime]);
+  }, [climateData, animation.currentTime, config, showTemperature, temperatureOpacity, selectedDatasetId]);
 
   // Set up click handler
   useEffect(() => {
@@ -277,13 +382,11 @@ export function CesiumGlobe({ onPointSelect }: CesiumGlobeProps) {
     const viewer = viewerRef.current;
     if (!viewer) return;
 
-    // Remove existing marker
     if (entityRef.current) {
       viewer.entities.remove(entityRef.current);
       entityRef.current = null;
     }
 
-    // Add new marker if point selected
     if (selectedPoint) {
       entityRef.current = viewer.entities.add({
         position: Cartesian3.fromDegrees(selectedPoint.lon, selectedPoint.lat),
@@ -301,7 +404,6 @@ export function CesiumGlobe({ onPointSelect }: CesiumGlobeProps) {
     <div className="w-full h-full relative" role="application" aria-label="3D Globe visualization">
       <div ref={containerRef} className="w-full h-full" />
 
-      {/* Coordinates display */}
       {selectedPoint && (
         <div className="absolute bottom-4 left-4 panel px-3 py-2 text-sm z-[1000]">
           <span className="text-slate-400">Selected: </span>
@@ -311,13 +413,11 @@ export function CesiumGlobe({ onPointSelect }: CesiumGlobeProps) {
         </div>
       )}
 
-      {/* Info overlay */}
       <div className="absolute top-4 left-4 panel px-3 py-2 z-[1000]">
         <div className="text-sm text-white font-medium">3D Globe View</div>
         <div className="text-xs text-slate-400">Drag to rotate, scroll to zoom</div>
       </div>
 
-      {/* Keyboard instructions (screen reader) */}
       <div className="sr-only" aria-live="polite">
         Use mouse to rotate the globe. Click to select a location.
       </div>
