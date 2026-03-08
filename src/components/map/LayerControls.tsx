@@ -4,13 +4,14 @@
 
 import { useState } from 'react';
 import { useUIStore } from '../../stores/uiStore';
+import { useDataStore } from '../../stores/dataStore';
 
-interface Layer {
-  id: string;
-  name: string;
-  visible: boolean;
-  opacity: number;
-}
+// Dataset display names
+const DATASET_NAMES: Record<string, string> = {
+  'era5-t2m': 'Temperature (ERA5)',
+  'era5-precip': 'Precipitation (ERA5)',
+  'cams-ozone': 'Total Column Ozone',
+};
 
 export function LayerControls() {
   const {
@@ -19,37 +20,43 @@ export function LayerControls() {
     showTemperature, setShowTemperature,
     temperatureOpacity, setTemperatureOpacity
   } = useUIStore();
+  const { selectedDatasetId } = useDataStore();
   const [isOpen, setIsOpen] = useState(false);
+  const [basemapOpacity, setBasemapOpacity] = useState(1);
+  const [labelsOpacity, setLabelsOpacity] = useState(1);
+  const [gridOpacity, setGridOpacity] = useState(0.5);
+  const [showBasemap, setShowBasemap] = useState(true);
 
-  const [layers, setLayers] = useState<Layer[]>([
-    { id: 'basemap', name: 'Base Map', visible: true, opacity: 1 },
-    { id: 'temperature', name: 'Temperature (ERA5)', visible: showTemperature, opacity: temperatureOpacity },
-    { id: 'labels', name: 'Labels', visible: showLabels, opacity: 1 },
-    { id: 'grid', name: 'Lat/Lon Grid', visible: showGrid, opacity: 0.5 },
-  ]);
+  // Get dynamic layer name based on selected dataset
+  const dataLayerName = DATASET_NAMES[selectedDatasetId || 'era5-t2m'] || 'Climate Data';
+
+  const layers = [
+    { id: 'basemap', name: 'Base Map', visible: showBasemap, opacity: basemapOpacity },
+    { id: 'data', name: dataLayerName, visible: showTemperature, opacity: temperatureOpacity },
+    { id: 'labels', name: 'Labels', visible: showLabels, opacity: labelsOpacity },
+    { id: 'grid', name: 'Lat/Lon Grid', visible: showGrid, opacity: gridOpacity },
+  ];
 
   const toggleLayer = (id: string) => {
-    setLayers((prev) =>
-      prev.map((layer) =>
-        layer.id === id ? { ...layer, visible: !layer.visible } : layer
-      )
-    );
-
-    if (id === 'labels') {
+    if (id === 'basemap') {
+      setShowBasemap(!showBasemap);
+    } else if (id === 'labels') {
       setShowLabels(!showLabels);
     } else if (id === 'grid') {
       setShowGrid(!showGrid);
-    } else if (id === 'temperature') {
+    } else if (id === 'data') {
       setShowTemperature(!showTemperature);
     }
   };
 
   const setOpacity = (id: string, opacity: number) => {
-    setLayers((prev) =>
-      prev.map((layer) => (layer.id === id ? { ...layer, opacity } : layer))
-    );
-
-    if (id === 'temperature') {
+    if (id === 'basemap') {
+      setBasemapOpacity(opacity);
+    } else if (id === 'labels') {
+      setLabelsOpacity(opacity);
+    } else if (id === 'grid') {
+      setGridOpacity(opacity);
+    } else if (id === 'data') {
       setTemperatureOpacity(opacity);
     }
   };

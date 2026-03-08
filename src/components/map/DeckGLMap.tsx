@@ -2,15 +2,61 @@
  * 2D Map visualization using Leaflet.
  */
 
-import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, useMapEvents, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import { useEffect, useRef } from 'react';
 import { useMapStore } from '../../stores/mapStore';
 import { useUIStore } from '../../stores/uiStore';
 import { MapProjection } from './MapProjection';
 import { LayerControls } from './LayerControls';
 import { ClimateDataLayer } from './ClimateDataLayer';
 import { announceToScreenReader, formatCoordinatesForScreenReader } from '../../utils/accessibility';
+
+// Component to add lat/lon grid overlay
+function GridOverlay({ visible }: { visible: boolean }) {
+  const map = useMap();
+  const gridLayerRef = useRef<L.LayerGroup | null>(null);
+
+  useEffect(() => {
+    if (!map) return;
+
+    // Remove existing grid
+    if (gridLayerRef.current) {
+      map.removeLayer(gridLayerRef.current);
+      gridLayerRef.current = null;
+    }
+
+    if (!visible) return;
+
+    // Create grid lines
+    const gridGroup = L.layerGroup();
+    const gridStyle = { color: '#ffffff', weight: 0.5, opacity: 0.3 };
+
+    // Latitude lines
+    for (let lat = -80; lat <= 80; lat += 20) {
+      const line = L.polyline([[lat, -180], [lat, 180]], gridStyle);
+      gridGroup.addLayer(line);
+    }
+
+    // Longitude lines
+    for (let lon = -180; lon <= 180; lon += 30) {
+      const line = L.polyline([[-90, lon], [90, lon]], gridStyle);
+      gridGroup.addLayer(line);
+    }
+
+    gridGroup.addTo(map);
+    gridLayerRef.current = gridGroup;
+
+    return () => {
+      if (gridLayerRef.current) {
+        map.removeLayer(gridLayerRef.current);
+      }
+    };
+  }, [map, visible]);
+
+  return null;
+}
 
 interface DeckGLMapProps {
   onPointSelect: (lat: number, lon: number) => void;
@@ -50,7 +96,7 @@ function MapClickHandler({ onPointSelect }: { onPointSelect: (lat: number, lon: 
 
 export function DeckGLMap({ onPointSelect }: DeckGLMapProps) {
   const { selectedPoint } = useMapStore();
-  const { showTemperature, temperatureOpacity } = useUIStore();
+  const { showTemperature, temperatureOpacity, showLabels, showGrid } = useUIStore();
 
   return (
     <div
@@ -64,9 +110,9 @@ export function DeckGLMap({ onPointSelect }: DeckGLMapProps) {
         className="w-full h-full"
         style={{ background: '#0f172a' }}
       >
-        {/* Dark basemap tiles */}
+        {/* Dark basemap tiles (no labels version) */}
         <TileLayer
-          url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+          url="https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png"
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
           maxZoom={19}
         />
@@ -76,6 +122,18 @@ export function DeckGLMap({ onPointSelect }: DeckGLMapProps) {
           opacity={temperatureOpacity}
           visible={showTemperature}
         />
+
+        {/* Labels layer (separate so it can be toggled) */}
+        {showLabels && (
+          <TileLayer
+            url="https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png"
+            maxZoom={19}
+            pane="overlayPane"
+          />
+        )}
+
+        {/* Lat/Lon Grid overlay */}
+        <GridOverlay visible={showGrid} />
 
         {/* Click handler */}
         <MapClickHandler onPointSelect={onPointSelect} />

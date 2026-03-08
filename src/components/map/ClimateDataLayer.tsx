@@ -39,7 +39,7 @@ const DATASET_CONFIG: Record<string, {
   'era5-precip': {
     file: '/data/era5_tp_sampled.json',
     minValue: 0,
-    maxValue: 0.008,
+    maxValue: 0.015,
     colorScale: 'precipitation',
   },
   'cams-ozone': {
