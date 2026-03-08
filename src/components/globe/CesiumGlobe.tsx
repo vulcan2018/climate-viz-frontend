@@ -50,19 +50,13 @@ const DATASET_CONFIG: Record<string, {
     maxValue: 320,
     colorScale: 'temperature',
   },
-  '2m_temperature': {
-    file: '/data/era5_t2m_sampled.json',
-    minValue: 220,
-    maxValue: 320,
-    colorScale: 'temperature',
-  },
-  'total_precipitation': {
+  'era5-precip': {
     file: '/data/era5_tp_sampled.json',
     minValue: 0,
     maxValue: 0.02,
     colorScale: 'precipitation',
   },
-  'total_column_ozone': {
+  'cams-ozone': {
     file: '/data/cams_ozone_sampled.json',
     minValue: 200,
     maxValue: 500,
