@@ -228,11 +228,13 @@ export function ClimateDataLayer({ opacity, visible }: ClimateDataLayerProps) {
     overlaysRef.current.forEach((overlay) => map.removeLayer(overlay));
     overlaysRef.current = [];
 
-    // Calculate bounds
-    const latSouth = lats[lats.length - 1] + 10;
-    const latNorth = lats[0] + 10;
-    const lonWest = lons[0] - 3;
-    const lonEast = lons[lons.length - 1] + 5 - 3;
+    // Calculate bounds - ERA5 data is 0-360 longitude system
+    // Data covers 90 to -90 lat, 0 to 355 lon (step ~5°)
+    const latSouth = Math.min(...lats);  // -90
+    const latNorth = Math.max(...lats);  // 90
+    // For 0-360 data, place overlay at 0 to 360 and use world wrapping
+    const lonWest = Math.min(...lons);   // 0
+    const lonEast = Math.max(...lons) + 5; // 360 (add one step for last cell)
 
     // Add overlays with world wrapping
     const worldOffsets = [-360, 0, 360];
